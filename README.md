@@ -8,6 +8,6 @@ This yields a directory full of .fits files. To make a movie from them, the need
 Then, you can use ffmpeg to turn those pngs into an mp4. The command that I used is:
 ffmpeg -framerate 8 -i frame_%04d.png -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" -c:v libx264 -pix_fmt yuv420p output_u16.mp4
 
-I haven't made a script for the download of the .fits yet. I just followed the dirtections here: https://docs.sunpy.org/en/stable/tutorial/acquiring_data/jsoc.html
+I haven't made a script for the download of the .fits yet. I just followed the directions here: https://docs.sunpy.org/en/stable/tutorial/acquiring_data/jsoc.html
 
 I hope this helps someone else.
