@@ -14,10 +14,10 @@ from astropy.io import fits
 from astropy.visualization import simple_norm
 from PIL import Image, ImageDraw, ImageFont
 
-INPUT_DIR = "c:/Projects/aia_downloads"       # Directory containing .fits/.fit files
+INPUT_DIR = "c:/Projects/aia_downloads/synoptic/"       # Directory containing .fits/.fit files
 
 # Load a fits file
-f = os.path.join(INPUT_DIR, 'AIA20251015_000000_0094.fits') 
+f = os.path.join(INPUT_DIR, 'AIA20250811_0000_0094.fits') 
 hdu_list = fits.open(f)
 image_data = hdu_list[1].data
 hdu_list.close()
@@ -36,7 +36,7 @@ plt.axis('off')
 # Add the date and time to the png
 plt.text(0,5, "text for image", color= 'white')
 # If you save with pyplot, you get an 8 bit png
-# plt.savefig('c:/Projects/aia_downloads/pngs/asinh_AIA20251015_000000_0094.png', bbox_inches='tight', pad_inches=0)
+# plt.savefig('c:/Projects/aia_downloads/pngs/asinh_AIA20250811_0000_0094..png', bbox_inches='tight', pad_inches=0)
 
 img = Image.fromarray(norm_data_u16, mode='I;16') # 'I;16' for 16-bit grayscale
 draw = ImageDraw.Draw(img)
@@ -51,4 +51,4 @@ text_color = (65535,)
 draw.text(text_position, text_to_add, font=font, fill=text_color)
 
 
-img.save('c:/Projects/aia_downloads/pngs/asinh_16bit_output_image_text2.png')
+img.save('c:/Projects/aia_downloads/synoptic/asinh_16bit_output_image_text2.png')

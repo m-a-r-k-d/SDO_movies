@@ -2,7 +2,7 @@
 """
 Created on Sat Oct 18 14:17:15 2025
 
-***************************** DEBUGGIN SCRIPT  *****************************
+***************************** DEBUGGING SCRIPT  *****************************
 Used to play with reading in .fits files
 
 @author: markd

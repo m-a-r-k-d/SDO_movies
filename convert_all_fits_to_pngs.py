@@ -5,43 +5,76 @@ Created on Sat Nov  1 12:00:53 2025
 ************************** IN PRODUCTION  ************************************
 This is the script that will convert a directory of .fits files to .png
 
-Use ffmpeg to create movie from .pngs. This worked for me:
+Once fits are converted to png then use ffmpeg to create movie from .pngs. 
+This works for me:
 ffmpeg -framerate 8 -i frame_%04d.png -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" -c:v libx264 -pix_fmt yuv420p output_u16.mp4
 
+Converts .fits files with filenames AIAYYYYMMDD_HHMM_wavelength.fits to png files
+This is the file name convention for AIA synoptic fits files.
+This converts the fits to 16 bit. Currently not sure if the resulting movies are 16 bit or not.
+The conversion here looks better than other conversions that I tried.
 
+INPUT_DIR: The script assumes that the data will be stored in a directory labeled 
+with the date of collection and the wavelength
+c:/Projects/aia_synoptic_downloads/<YYYYMMDD>/<wavelength>
 
-Converts .fits files with filenames AIAYYYYMMDD_HHMMSS_wavelength.fits to png files
-Creates 16 bit .pngs
+OUTPUT_DIR: The script will output the converted .png files to:
+c:/Projects/aia_synoptic_downloads/<YYYYMMDD>/<wavelength>/png
+
+This would be easy enough to change below.
+
+Notes:
+It can't handle conversions across multiple days, but that would be nice. It's one day one movie currently.
+The astropy package's simple_norm function returns a DeprecationWarning that it uses Pillow's
+mode parameter that will be removed in 10-2026!
 
 @author: markd
 """
 
 import os
 import re
-import matplotlib.pyplot as plt
+# I do not use matplotlib for this, but kept some code in here for it
+# import matplotlib.pyplot as plt
 import numpy as np
 from astropy.io import fits
 from astropy.visualization import simple_norm
 import datetime as dt
 from PIL import  Image, ImageDraw, ImageFont
+import ffmpeg
 
-INPUT_DIR = "c:/Projects/aia_downloads"       # Directory containing .fits/.fit files
-OUTPUT_DIR = "c:/Projects/aia_downloads/pngs"     # Directory to write PNGs (frame_ naming is removed)
+# USER ENTERS DATE AND WAVELENGTH FOR THE DATA TO BE CONVERTED
+date_str = '20250810'
+wvl = '0094'
+
+stretch = 'asinh'
+asinh_a = 0.5 # default = 0.1
+# percent = 89.0
+min_percent = 0.0
+max_percent = 80.0
+
+# The user can change the directories in the next few lines
+INPUT_DIR = os.path.join("c:/Projects/aia_synoptic_downloads", date_str, wvl)       # Directory containing .fits/.fit files
+OUTPUT_DIR = os.path.join("c:/Projects/aia_synoptic_downloads",date_str, wvl, 'png')     # Directory to write PNGs
+print(f'INPUT_DIR = {INPUT_DIR}')
+print(f'OUTPUT_DIR = {OUTPUT_DIR}')
+
+# START OF SCRIPT
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 
 def extract_datetime_from_filename(filepath):
     base = os.path.basename(filepath)
-    m = re.match(r'^AIA(\d{8})_(\d{6})', base)
+    m = re.match(r'^AIA(\d{8})_(\d{4})', base)
     if not m:
         raise ValueError(
-            f"Filename does not match the required pattern 'AIAYYYYMMDD_HHMMSS...': {base}"
+            f"Filename does not match the required pattern 'AIAYYYYMMDD_HHMM...': {base}"
         )
-    dt_str = m.group(1) + m.group(2)  # YYYYMMDDHHMMSS
+    dt_str = m.group(1) + m.group(2)  # YYYYMMDDHHMM
     try:
-        return dt.datetime.strptime(dt_str, "%Y%m%d%H%M%S")
+        return dt.datetime.strptime(dt_str, "%Y%m%d%H%M")
     except ValueError:
         raise ValueError(f"Filename pattern matched but invalid date/time: {base}")
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 fits_files = [
     os.path.join(INPUT_DIR, f) for f in os.listdir(INPUT_DIR)
@@ -68,7 +101,7 @@ for element in fits_with_dt:
     pad_cnt = f"{cnt:04d}"
     
     # ffmpeg requires a simple name for the .png like frame_xxxx.png
-    output_path = os.path.join(OUTPUT_DIR, f"frame_{pad_cnt}.png")
+    output_path = os.path.join(OUTPUT_DIR, f"frame_{stretch}_{asinh_a}_{min_percent}_{max_percent}_{pad_cnt}.png")
     
     print(f"Converting {base}  -->  frame_{pad_cnt}.png")
     hdu_list = fits.open(fits_path)
@@ -76,7 +109,7 @@ for element in fits_with_dt:
     hdu_list.close()
     
     # Create a ImageNormalize object. the asinh normalization looked good to me
-    norm_asinh = simple_norm(image_data, 'asinh', percent=99.25)
+    norm_asinh = simple_norm(image_data, stretch, asinh_a=asinh_a, min_percent=min_percent, max_percent=max_percent)
     # Use the object to create normalized data
     norm_data = norm_asinh(image_data)
     norm_data_zeroed = norm_data - norm_data.min()
@@ -84,13 +117,15 @@ for element in fits_with_dt:
     norm_data_u16 = (norm_data_final * 65535).astype(np.uint16)
     
 
+    # Keeping this code here so I remember the commands
     # Doing this with matplotlibs pyplot results in an 8 bit png
     # plt.imshow(norm_data_u16, norm=norm_asinh, origin='lower', cmap='gray')
     # plt.text(0, 10, date_time, color= 'white')
     # plt.axis('off')
     # plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
     
-    # Using Pillow, you can make a 16 bit png. Noticeably better movies.
+    # Using Pillow, you can make a 16 bit png. 
+    # The date and time are added to each image
     img = Image.fromarray(norm_data_u16, mode='I;16')
     draw = ImageDraw.Draw(img)
     try:
@@ -104,8 +139,16 @@ for element in fits_with_dt:
     draw.text(text_position, text_to_add, font=font, fill=text_color)
     img.save(output_path)
     
-    plt.close()
+    # plt.close() # For matplotlib, close the plt object
+    img.close() # For Pillow, close the image
     cnt += 1
-    
-
+ 
+# TODO: Put the ffmpeg command here
+(
+ffmpeg
+.input(os.path.join(OUTPUT_DIR,f'frame_{stretch}_{asinh_a}_{min_percent}_{max_percent}_%04d.png'), framerate=8)
+.filter('pad', 'ceil(iw/2)*2', 'ceil(ih/2)*2')
+.output(os.path.join(OUTPUT_DIR,f'output_u16_{stretch}_{asinh_a}_{min_percent}_{max_percent}.mp4'), vcodec='libx264', pix_fmt='yuv420p')
+.run()
+)
     
